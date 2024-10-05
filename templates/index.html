@@ -1,0 +1,303 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Language Recognition</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .prediction-box {
+            transition: all 0.3s ease;
+        }
+        .video-container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+        }
+        #videoFeed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .text-composition {
+            position: relative;
+        }
+        .blinking-cursor {
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            from, to { opacity: 1 }
+            50% { opacity: 0 }
+        }
+        .instruction-card {
+            background-color: #f8fafc;
+            border-left: 4px solid #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Sign Language Recognition</h1>
+            <p class="text-gray-600">Create and speak sentences using sign language!</p>
+        </header>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="space-y-6">
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="video-container rounded-lg overflow-hidden">
+                        <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Video feed">
+                    </div>
+                    <div class="mt-4 flex justify-between">
+                        <button id="predictBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 focus:outline-none">
+                            <i class="fas fa-plus mr-2"></i>Add Letter (Enter)
+                        </button>
+                        <button id="backspaceBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 focus:outline-none">
+                            <i class="fas fa-backspace mr-2"></i>Backspace
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold mb-4">Current Prediction</h2>
+                    <div id="prediction" class="prediction-box text-6xl font-bold text-center p-8 bg-gray-100 rounded-lg">
+                        -
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold">Your Message</h3>
+                        <div class="space-x-2">
+                            <button id="speakBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 focus:outline-none">
+                                <i class="fas fa-volume-up mr-2"></i>Speak
+                            </button>
+                            <button id="clearBtn" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 focus:outline-none">
+                                <i class="fas fa-trash mr-2"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-composition bg-gray-100 p-4 rounded-lg min-h-[100px] text-lg">
+                        <span id="composedText"></span><span class="blinking-cursor">|</span>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-semibold mb-4">Instructions</h3>
+                    <div class="space-y-4">
+                        <div class="instruction-card p-3 rounded">
+                            <h4 class="font-semibold">Getting Started</h4>
+                            <ol class="list-decimal list-inside text-gray-700 ml-4">
+                                <li>Position your hand within the green box</li>
+                                <li>Ensure good lighting for accurate detection</li>
+                                <li>Hold your sign steady for best results</li>
+                            </ol>
+                        </div>
+                        <div class="instruction-card p-3 rounded">
+                            <h4 class="font-semibold">Composing Messages</h4>
+                            <ul class="list-disc list-inside text-gray-700 ml-4">
+                                <li>Press <kbd class="bg-gray-200 px-1 rounded">Enter</kbd> or click "Add Letter" to add the current prediction</li>
+                                <li>Use the 'space' gesture or Space key to add spaces</li>
+                                <li>Use 'del' gesture or Backspace to remove letters</li>
+                                <li>Click "Speak" to hear your message out loud</li>
+                            </ul>
+                        </div>
+                        <div class="instruction-card p-3 rounded">
+                            <h4 class="font-semibold">Tips</h4>
+                            <ul class="list-disc list-inside text-gray-700 ml-4">
+                                <li>Practice each gesture to improve accuracy</li>
+                                <li>Use the "Clear" button to start over</li>
+                                <li>Take your time between gestures for better results</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let composedText = '';
+        const composedTextElement = document.getElementById('composedText');
+        const predictBtn = document.getElementById('predictBtn');
+        const backspaceBtn = document.getElementById('backspaceBtn');
+        const speakBtn = document.getElementById('speakBtn');
+        const clearBtn = document.getElementById('clearBtn');
+
+        function updateComposedText() {
+            composedTextElement.textContent = composedText;
+        }
+        //------------------------ DEPLOY THINGS -----------------------
+        // New JavaScript for handling client-side webcam
+        async function setupWebcam() {
+            const video = document.createElement('video');
+            video.setAttribute('playsinline', '');
+            video.setAttribute('autoplay', '');
+            video.setAttribute('muted', '');
+            video.style.width = '100%';
+            video.style.height = '100%';
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'user',
+                },
+                audio: false,
+            });
+            video.srcObject = stream;
+
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    video.play();
+                    resolve(video);
+                };
+            });
+        }
+
+        // Function to capture frame from video
+        function captureFrame(video) {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            return canvas.toDataURL('image/jpeg');
+        }
+
+        // Modified prediction function
+        async function getPrediction(video) {
+            const frameData = captureFrame(video);
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ image: frameData }),
+            });
+            return response.json();
+        }
+
+        // Initialize webcam when page loads
+        window.onload = async function() {
+            try {
+                const video = await setupWebcam();
+                const videoContainer = document.querySelector('.video-container');
+                videoContainer.innerHTML = '';
+                videoContainer.appendChild(video);
+
+                // Rest of your initialization code
+            } catch (error) {
+                console.error('Error initializing webcam:', error);
+                // Handle error appropriately in the UI
+            }
+        };
+        //-------------------------------------------------------------
+
+        function addPrediction(prediction) {
+            if (prediction.toLowerCase() === 'space') {
+                composedText += ' ';
+            } else if (prediction.toLowerCase() === 'del') {
+                composedText = composedText.slice(0, -1);
+            } else if (prediction.toLowerCase() !== 'nothing') {
+                composedText += prediction;
+            }
+            updateComposedText();
+        }
+
+        function handleBackspace() {
+            composedText = composedText.slice(0, -1);
+            updateComposedText();
+        }
+
+        function clearText() {
+            composedText = '';
+            updateComposedText();
+        }
+
+        function speakText() {
+            if (composedText.trim()) {
+                fetch('/speak_text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({text: composedText})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'error') {
+                        console.error('Error speaking text:', data.message);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+
+        predictBtn.addEventListener('click', () => {
+            fetch('/get_prediction')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.prediction) {
+                        const predictionElement = document.getElementById('prediction');
+                        predictionElement.textContent = data.prediction;
+                        predictionElement.classList.add('scale-110');
+                        setTimeout(() => {
+                            predictionElement.classList.remove('scale-110');
+                        }, 200);
+                        addPrediction(data.prediction);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        backspaceBtn.addEventListener('click', handleBackspace);
+        speakBtn.addEventListener('click', speakText);
+        clearBtn.addEventListener('click', clearText);
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                predictBtn.click();
+            } else if (event.key === 'Backspace') {
+                handleBackspace();
+            }
+        });
+
+        //------------------------ LOCAL THINGS -----------------------
+        // function updatePrediction() {
+        //     fetch('/get_prediction')
+        //         .then(response => response.json())
+        //         .then(data => {
+        //             const predictionElement = document.getElementById('prediction');
+        //             if (data.prediction) {
+        //                 predictionElement.textContent = data.prediction;
+        //             }
+        //         })
+        //         .catch(error => console.error('Error:', error));
+        // }
+
+
+        //------------------------ DEPLOY THINGS -----------------------
+        // Modify your existing updatePrediction function
+        async function updatePrediction() {
+            const video = document.querySelector('video');
+            if (video) {
+                try {
+                    const prediction = await getPrediction(video);
+                    const predictionElement = document.getElementById('prediction');
+                    if (prediction.label) {
+                        predictionElement.textContent = prediction.label;
+                    }
+                } catch (error) {
+                    console.error('Error getting prediction:', error);
+                }
+            }
+        }
+        //---------------------------------------------------------------
+
+        setInterval(updatePrediction, 500);
+    </script>
+</body>
+</html>
